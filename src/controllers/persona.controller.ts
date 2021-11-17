@@ -1,30 +1,32 @@
+import {service} from '@loopback/core';
 import {
   Count,
   CountSchema,
   Filter,
   FilterExcludingWhere,
   repository,
-  Where,
+  Where
 } from '@loopback/repository';
 import {
-  post,
-  param,
-  get,
-  getModelSchemaRef,
-  patch,
-  put,
-  del,
-  requestBody,
-  response,
+  del, get,
+  getModelSchemaRef, param, patch, post, put, requestBody,
+  response
 } from '@loopback/rest';
 import {Persona} from '../models';
 import {PersonaRepository} from '../repositories';
+import {AutenticacionService} from '../services/autenticacion.service';
+// imprtamos l paquete de fech para comunicacion con spyder
+const fetch = require("node-fetch");
 
 export class PersonaController {
   constructor(
     @repository(PersonaRepository)
-    public personaRepository : PersonaRepository,
-  ) {}
+    public personaRepository: PersonaRepository,
+    // llamamos de la autenticaccion services ,
+    //  creando el servicio
+    @service(AutenticacionService)
+    public servicioAutenticacion: AutenticacionService,
+  ) { }
 
   @post('/personas')
   @response(200, {
@@ -44,7 +46,31 @@ export class PersonaController {
     })
     persona: Omit<Persona, 'id'>,
   ): Promise<Persona> {
-    return this.personaRepository.create(persona);
+    //llamamos alservicio que creamos donde esta los metodos
+    let clave = this.servicioAutenticacion.GenerarClave();
+    let claveCifrada = this.servicioAutenticacion.CifrarClave(clave);
+    // enviamos la clave al objeto persona
+    persona.clave = claveCifrada;
+    // quitamos el retorno para poner el await ,
+    // guardamos el objeto en una variable este caso (p)
+    // creamos el metodo en la archivo authentication.services en la carpeta de servicios
+    let p = await this.personaRepository.create(persona);
+    //notificaciones usuario
+    // instalamos el fetch npm i note-fetch@2 version(2)
+    //servicio de fetch que creamos en el spyder
+    let destino = persona.correo;
+    let asunto = "Registro en la App Pedidos";
+    // comillas para mesajes dinamicos StringTemplate
+    // interpolacion de variables ${}
+    let contenido = `Hola,${persona.nombres}, su usuario para el acceso a la aplicacion es
+       ${persona.correo} y su contraseña es: ${clave}`;
+
+    //llamamos la variables quecreamos arriba
+    fetch(`http://127.0.0.1:5000/enviar-correo?correo_electronico=${destino}&asunto=${asunto}&contenido=${contenido}`)
+      .then((data: any) => {
+        console.log(data);
+      });
+    return p;
   }
 
   @get('/personas/count')
