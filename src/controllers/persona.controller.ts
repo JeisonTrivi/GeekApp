@@ -9,10 +9,11 @@ import {
 } from '@loopback/repository';
 import {
   del, get,
-  getModelSchemaRef, param, patch, post, put, requestBody,
+  getModelSchemaRef, HttpErrors, param, patch, post, put, requestBody,
   response
 } from '@loopback/rest';
-import {Persona} from '../models';
+import {Llaves} from '../config/llaves';
+import {Credenciales, Persona} from '../models';
 import {PersonaRepository} from '../repositories';
 import {AutenticacionService} from '../services/autenticacion.service';
 // imprtamos l paquete de fech para comunicacion con spyder
@@ -66,12 +67,39 @@ export class PersonaController {
        ${persona.correo} y su contraseña es: ${clave}`;
 
     //llamamos la variables quecreamos arriba
-    fetch(`http://127.0.0.1:5000/enviar-correo?correo_electronico=${destino}&asunto=${asunto}&contenido=${contenido}`)
+    fetch(`${Llaves.urlServicioNotificaciones}/enviar-correo?correo_electronico=${destino}&asunto=${asunto}&contenido=${contenido}`)
       .then((data: any) => {
         console.log(data);
       });
     return p;
   }
+  //metodo para la autenticacion de roles
+  @post('/identificarPersona', {
+    responses: {
+      '200': {
+        description: "pagina para identificacion de usuarios"
+      }
+    }
+  })
+  async identificarPersona(
+    @requestBody() crediciales: Credenciales
+  ) {
+    let p = await this.servicioAutenticacion.IdentificarPersona(crediciales.usuario, crediciales.clave)
+    if (p) {
+      let token = this.servicioAutenticacion.GenerarTokenJWT(p);
+      return {
+        datos: {
+          nombre: p.nombres,
+          correo: p.correo,
+          id: p.id,
+        },
+        tk: token
+      }
+    } else {
+      throw new HttpErrors[401]("Los datos ingresados son invalidos");
+    }
+  }
+
 
   @get('/personas/count')
   @response(200, {
